@@ -2,7 +2,7 @@ terraform {
   required_providers {
     proxmox = {
       source  = "Telmate/proxmox"
-      version = "2.9.14"
+      version = "~> 2.9"
     }
   }
 }
@@ -21,31 +21,34 @@ resource "proxmox_vm_qemu" "master" {
   clone       = "{{ config.proxmox.template }}"
   agent       = 1
   os_type     = "cloud-init"
-  cores       = 2
+  cores       = {{ config.proxmox.master_cores }}
   sockets     = 1
   cpu         = "host"
-  memory      = 2048
+  memory      = {{ config.proxmox.master_memory }}
   scsihw      = "virtio-scsi-pci"
   bootdisk    = "scsi0"
 
   disk {
     slot    = 0
-    size    = "20G"
+    size    = "{{ config.proxmox.master_disk }}"
     type    = "scsi"
-    storage = "local-lvm"
+    storage = "{{ config.proxmox.storage }}"
   }
 
   network {
     model  = "virtio"
-    bridge = "vmbr0"
+    bridge = "{{ config.proxmox.bridge }}"
   }
 
-  # SSH keys
   {% if config.ssh_key_path %}
   sshkeys = <<EOF
   {{ ssh_key }}
   EOF
   {% endif %}
+
+  lifecycle {
+    ignore_changes = [network]
+  }
 }
 
 resource "proxmox_vm_qemu" "worker" {
@@ -55,23 +58,23 @@ resource "proxmox_vm_qemu" "worker" {
   clone       = "{{ config.proxmox.template }}"
   agent       = 1
   os_type     = "cloud-init"
-  cores       = 2
+  cores       = {{ config.proxmox.worker_cores }}
   sockets     = 1
   cpu         = "host"
-  memory      = 4096
+  memory      = {{ config.proxmox.worker_memory }}
   scsihw      = "virtio-scsi-pci"
   bootdisk    = "scsi0"
 
   disk {
     slot    = 0
-    size    = "40G"
+    size    = "{{ config.proxmox.worker_disk }}"
     type    = "scsi"
-    storage = "local-lvm"
+    storage = "{{ config.proxmox.storage }}"
   }
 
   network {
     model  = "virtio"
-    bridge = "vmbr0"
+    bridge = "{{ config.proxmox.bridge }}"
   }
 
   {% if config.ssh_key_path %}
@@ -79,12 +82,19 @@ resource "proxmox_vm_qemu" "worker" {
   {{ ssh_key }}
   EOF
   {% endif %}
+
+  lifecycle {
+    ignore_changes = [network]
+  }
 }
 
 output "master_ips" {
-  value = proxmox_vm_qemu.master[*].default_ipv4_address
+  value       = proxmox_vm_qemu.master[*].default_ipv4_address
+  description = "IP addresses of master nodes"
 }
 
 output "worker_ips" {
-  value = proxmox_vm_qemu.worker[*].default_ipv4_address
+  value       = proxmox_vm_qemu.worker[*].default_ipv4_address
+  description = "IP addresses of worker nodes"
 }
+

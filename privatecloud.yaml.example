@@ -1,11 +1,26 @@
 cluster_name: my-private-cloud
+provider: bare-metal          # or "proxmox"
 k3s_version: v1.29.0+k3s1
 
 nodes:
   - host: 192.168.1.10
     user: root
+    role: master
   - host: 192.168.1.11
     user: root
+    role: worker
+
+# Uncomment and configure if provider: proxmox
+# proxmox:
+#   url: https://192.168.1.100:8006/api2/json
+#   token_id: root@pam!mytoken
+#   token_secret: your-secret-here
+#   node: pve
+#   template: ubuntu-2204-template
+#   master_count: 1
+#   worker_count: 2
+#   storage: local-lvm
+#   bridge: vmbr0
 
 services:
   metallb: true

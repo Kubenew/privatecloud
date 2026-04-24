@@ -1,25 +1,33 @@
-cluster_name: demo-private-cloud
-provider: proxmox  # proxmox, hetzner, libvirt, vsphere, openstack
+# PrivateCloud — Proxmox Provider Example
+# Set provider to "proxmox" and configure the proxmox block.
+# Nodes will be provisioned automatically via Terraform.
 
-# Proxmox specific config (if provider=proxmox)
+cluster_name: demo-private-cloud
+provider: proxmox
+k3s_version: v1.29.0+k3s1
+
 proxmox:
   url: https://proxmox.example.com:8006/api2/json
+  token_id: root@pam!mytoken
+  token_secret: your-api-token-secret
   node: pve-1
+  template: ubuntu-2204-template
+  master_count: 1
+  worker_count: 2
   storage: local-lvm
+  bridge: vmbr0
+  master_cores: 2
+  master_memory: 2048
+  master_disk: "20G"
+  worker_cores: 4
+  worker_memory: 8192
+  worker_disk: "80G"
 
-nodes:
-  - host: 192.168.1.10
-    user: root
-    role: master
-  - host: 192.168.1.11
-    user: root
-    role: worker
-
-k3s_version: v1.29.0+k3s1
+# ssh_key_path: ~/.ssh/id_rsa.pub
 
 services:
   metallb: true
   ingress_nginx: true
   cert_manager: true
   monitoring: true
-  longhorn: false  # or true for persistent storage
+  longhorn: false
