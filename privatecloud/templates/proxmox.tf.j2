@@ -1,0 +1,90 @@
+terraform {
+  required_providers {
+    proxmox = {
+      source  = "Telmate/proxmox"
+      version = "2.9.14"
+    }
+  }
+}
+
+provider "proxmox" {
+  pm_api_url          = "{{ config.proxmox.url }}"
+  pm_api_token_id     = "{{ config.proxmox.token_id }}"
+  pm_api_token_secret = "{{ config.proxmox.token_secret }}"
+  pm_tls_insecure     = true
+}
+
+resource "proxmox_vm_qemu" "master" {
+  count       = {{ config.proxmox.master_count }}
+  name        = "{{ config.cluster_name }}-master-${count.index}"
+  target_node = "{{ config.proxmox.node }}"
+  clone       = "{{ config.proxmox.template }}"
+  agent       = 1
+  os_type     = "cloud-init"
+  cores       = 2
+  sockets     = 1
+  cpu         = "host"
+  memory      = 2048
+  scsihw      = "virtio-scsi-pci"
+  bootdisk    = "scsi0"
+
+  disk {
+    slot    = 0
+    size    = "20G"
+    type    = "scsi"
+    storage = "local-lvm"
+  }
+
+  network {
+    model  = "virtio"
+    bridge = "vmbr0"
+  }
+
+  # SSH keys
+  {% if config.ssh_key_path %}
+  sshkeys = <<EOF
+  {{ ssh_key }}
+  EOF
+  {% endif %}
+}
+
+resource "proxmox_vm_qemu" "worker" {
+  count       = {{ config.proxmox.worker_count }}
+  name        = "{{ config.cluster_name }}-worker-${count.index}"
+  target_node = "{{ config.proxmox.node }}"
+  clone       = "{{ config.proxmox.template }}"
+  agent       = 1
+  os_type     = "cloud-init"
+  cores       = 2
+  sockets     = 1
+  cpu         = "host"
+  memory      = 4096
+  scsihw      = "virtio-scsi-pci"
+  bootdisk    = "scsi0"
+
+  disk {
+    slot    = 0
+    size    = "40G"
+    type    = "scsi"
+    storage = "local-lvm"
+  }
+
+  network {
+    model  = "virtio"
+    bridge = "vmbr0"
+  }
+
+  {% if config.ssh_key_path %}
+  sshkeys = <<EOF
+  {{ ssh_key }}
+  EOF
+  {% endif %}
+}
+
+output "master_ips" {
+  value = proxmox_vm_qemu.master[*].default_ipv4_address
+}
+
+output "worker_ips" {
+  value = proxmox_vm_qemu.worker[*].default_ipv4_address
+}

@@ -2,8 +2,8 @@ import shutil
 from dataclasses import dataclass
 from typing import List
 
-REQUIRED_TOOLS = ["ssh", "scp", "curl"]
-OPTIONAL_TOOLS = ["kubectl", "helm"]
+REQUIRED_TOOLS = ["ssh", "scp", "curl", "helm", "terraform"]
+OPTIONAL_TOOLS = ["kubectl"]
 
 
 @dataclass
