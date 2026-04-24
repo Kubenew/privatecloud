@@ -82,6 +82,10 @@ privatecloud destroy       # tear down (Terraform providers only)
 
 ## Config File
 
+> [!WARNING]
+> **DO NOT COMMIT `privatecloud.yaml` OR YOUR TERRAFORM DIRECTORY TO GIT.** 
+> Your configuration contains secrets (e.g. Proxmox API tokens). Add `privatecloud.yaml` and `.terraform*` to your `.gitignore`.
+
 Created automatically by `privatecloud init`:
 
 ```yaml

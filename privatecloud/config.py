@@ -41,6 +41,7 @@ class PrivateCloudConfig(BaseModel):
     cluster_name: str = "my-private-cloud"
     provider: str = "bare-metal"
     k3s_version: str = "v1.29.0+k3s1"
+    terraform_dir: str = "."
 
     nodes: List[NodeConfig] = Field(default_factory=list)
     proxmox: Optional[ProxmoxConfig] = None
