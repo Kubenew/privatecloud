@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PrivateCloud Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <div class="container">
+        <h1>☁️ PrivateCloud Control Panel</h1>
+        
+        <div class="status-card" id="status">
+            <h2>Cluster Health</h2>
+            <p>Loading...</p>
+        </div>
+
+        <div class="backup-section">
+            <h2>Backup & Restore</h2>
+            <button onclick="triggerBackup()">📦 Create Backup Now</button>
+            <h3>Available Backups</h3>
+            <ul id="backup-list">
+                {% for backup in backups %}
+                <li>{{ backup }}</li>
+                {% endfor %}
+            </ul>
+            <div class="restore-form">
+                <input type="text" id="restore-name" placeholder="backup_folder_name">
+                <button onclick="triggerRestore()">🔄 Restore</button>
+            </div>
+        </div>
+
+        <div class="danger-section">
+            <h2>⚠️ Danger Zone</h2>
+            <button onclick="triggerDestroy()">💀 Destroy Entire Cluster</button>
+        </div>
+    </div>
+
+    <script>
+        function refreshStatus() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('status').innerHTML = `
+                        <h2>Cluster Health</h2>
+                        <div class="status-item ${data.healthy ? 'ok' : 'error'}">
+                            ${data.healthy ? '✅ Healthy' : '❌ Unhealthy'}
+                        </div>
+                        <div class="status-item">🖥️ Nodes: ${data.node_count}</div>
+                        <div class="status-item">📦 Pods: ${data.pod_count}</div>
+                    `;
+                })
+                .catch(() => {
+                    document.getElementById('status').innerHTML = `
+                        <h2>Cluster Health</h2>
+                        <div class="status-item error">❌ Cannot connect to cluster</div>
+                    `;
+                });
+        }
+
+        function triggerBackup() {
+            if (!confirm('Create a new backup?')) return;
+            fetch('/api/backup', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => alert(data.success ? '✅ Backup created' : '❌ Error: ' + data.output))
+                .catch(err => alert('❌ Error: ' + err));
+        }
+
+        function triggerRestore() {
+            let backup = document.getElementById('restore-name').value;
+            if (!backup) return alert('Enter backup folder name');
+            if (!confirm('⚠️ This will overwrite current cluster state. Continue?')) return;
+            fetch('/api/restore', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({backup})})
+                .then(r => r.json())
+                .then(data => alert(data.success ? '✅ Restore complete' : '❌ ' + data.output));
+        }
+
+        function triggerDestroy() {
+            if (confirm('⚠️ DESTROY EVERYTHING?\n\nThis will:\n- Remove all Kubernetes resources\n- Delete all Terraform-managed VMs\n- Remove all backups\n\nThis CANNOT be undone!')) {
+                if (confirm('Are you absolutely sure? Type "yes" in the next prompt to confirm.')) {
+                    fetch('/api/destroy', {method: 'POST'})
+                        .then(r => r.json())
+                        .then(data => alert(data.output));
+                }
+            }
+        }
+
+        refreshStatus();
+        setInterval(refreshStatus, 10000);
+    </script>
+</body>
+</html>

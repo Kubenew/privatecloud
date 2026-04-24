@@ -1,12 +1,16 @@
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich import print as rprint
 import os
+from datetime import datetime
 
 from .doctor import check_tools
 from .utils import save_default_config, load_config, save_config
 from .installer import install
 from .terraform import apply_and_update_config, terraform_destroy
+from .security import write_gitignore, mask_dict_secrets
+from .backup import create_backup as do_backup, list_backups as do_list_backups, restore_backup as do_restore_backup, delete_backup as do_delete_backup
 
 app = typer.Typer(help="PrivateCloud: one-command private cloud installer.")
 console = Console()
@@ -15,6 +19,8 @@ console = Console()
 @app.command()
 def init():
     save_default_config()
+    if write_gitignore():
+        console.print("[green]Created .gitignore with PrivateCloud rules[/green]")
     console.print("[green]Created privatecloud.yaml[/green]")
 
 
@@ -58,7 +64,7 @@ def plan():
         console.print("[bold]Nodes:[/bold] [yellow]Will be provisioned dynamically via Terraform[/yellow]")
 
     console.print("[bold]Services:[/bold]")
-    console.print(cfg.services.model_dump())
+    console.print(mask_dict_secrets(cfg.services.model_dump()))
 
 
 @app.command()
@@ -93,21 +99,126 @@ def install_cluster(dry_run: bool = typer.Option(False, "--dry-run", help="Show 
 
 
 @app.command()
-def destroy():
+def destroy(
+    yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompt"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview what would be destroyed"),
+    backup: bool = typer.Option(True, "--backup/--no-backup", help="Create backup before destroying"),
+    auto_yes: bool = False,
+):
+    """Destroy the cluster and all associated resources."""
     cfg = load_config()
     if cfg.provider == "bare-metal":
         console.print("[yellow]Destroy is only supported for cloud providers managed by Terraform.[/yellow]")
         return
-        
+
+    if backup and not dry_run and not auto_yes:
+        console.print("[yellow]Creating backup before destruction...[/yellow]")
+        do_backup()
+
+    if not yes and not dry_run and not auto_yes:
+        console.print(f"[bold red]⚠️  This will DESTROY the entire cluster '{cfg.cluster_name}'![/bold red]")
+        confirm = console.input("\nType 'yes' to confirm: ")
+        if confirm.lower() != "yes":
+            console.print("Aborted.")
+            return
+
+    backup_dir = None
+    if backup and not dry_run and not auto_yes:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = f"backup_{timestamp}"
+        os.makedirs(backup_dir, exist_ok=True)
+        if os.path.exists("terraform"):
+            shutil.copytree("terraform", f"{backup_dir}/terraform")
+        if os.path.exists("privatecloud.yaml"):
+            shutil.copy("privatecloud.yaml", f"{backup_dir}/privatecloud.yaml")
+        console.print(f"[yellow]Backup created at {backup_dir}/[/yellow]")
+
     console.print(f"[bold red]Destroying cluster {cfg.cluster_name}...[/bold red]")
     terraform_destroy(run_dir=cfg.terraform_dir)
-    
-    # Clear nodes list from config
+
     cfg.nodes = []
     save_config(cfg)
-    console.print("[green]Cluster destroyed and config updated.[/green]")
+
+    for f in ["kubeconfig", "terraform/terraform.tfstate", "terraform/terraform.tfstate.backup"]:
+        if os.path.exists(f):
+            if dry_run:
+                console.print(f"[yellow](dry-run) Would remove {f}[/yellow]")
+            else:
+                if os.path.isdir(f):
+                    import shutil
+                    shutil.rmtree(f)
+                else:
+                    os.remove(f)
+
+    if dry_run:
+        console.print("[yellow]Dry run complete – no changes made.[/yellow]")
+    else:
+        console.print("[green]Cluster destroyed successfully.[/green]")
+        if backup_dir:
+            console.print(f"Backup stored in {backup_dir}/")
+
+    return True
 
 
 if __name__ == "__main__":
     app()
+
+
+backup_group = typer.Typer(help="Backup and restore operations.")
+app.add_typer(backup_group, name="backup")
+
+
+@backup_group.command()
+def create(name: str = typer.Argument(None, help="Optional backup name")):
+    """Create a new backup."""
+    result = do_backup(name)
+    if result:
+        console.print(f"[green]Backup created: {result}[/green]")
+
+
+@backup_group.command()
+def list():
+    """List all backups."""
+    backups = do_list_backups()
+    if backups:
+        console.print("[bold]Available backups:[/bold]")
+        for b in backups:
+            console.print(f"  - {b}")
+    else:
+        console.print("[yellow]No backups found[/yellow]")
+
+
+@backup_group.command()
+def restore(backup_name: str = typer.Argument(..., help="Backup name to restore")):
+    """Restore from a backup."""
+    console.print(f"[yellow]Restoring from {backup_name}...[/yellow]")
+    if do_restore_backup(backup_name):
+        console.print("[green]Restore complete[/green]")
+    else:
+        console.print("[red]Restore failed[/red]")
+        raise typer.Exit(code=1)
+
+
+@backup_group.command()
+def delete(backup_name: str = typer.Argument(..., help="Backup name to delete")):
+    """Delete a backup."""
+    if do_delete_backup(backup_name):
+        console.print(f"[green]Deleted backup: {backup_name}[/green]")
+    else:
+        console.print(f"[red]Backup not found: {backup_name}[/red]")
+
+
+@app.command()
+def gui(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address"),
+    port: int = typer.Option(5000, "--port", help="Port"),
+):
+    """Start web-based GUI dashboard."""
+    try:
+        from .gui.app import run_gui
+        console.print(f"[cyan]Starting GUI at http://{host}:{port}[/cyan]")
+        run_gui(host=host, port=port)
+    except ImportError as e:
+        console.print(f"[red]Flask not installed. Run: pip install flask[/red]")
+        raise typer.Exit(code=1)
 
