@@ -60,7 +60,22 @@ services:
 - `privatecloud doctor` - check system dependencies
 - `privatecloud plan` - print install plan
 - `privatecloud install-cluster` - deploy private cloud stack
+- `privatecloud install-cluster --dry-run` - preview without installing
 - `privatecloud destroy` - placeholder (v0.2.0)
+
+## Provider Modules Roadmap
+
+The following cloud providers are planned for future releases:
+
+| Provider | Status | Description |
+|----------|--------|-------------|
+| Proxmox | 🔜 v0.2.0 | Proxmox VE integration |
+| Hetzner | 🔜 v0.2.0 | Hetzner Cloud API |
+| LibVirt | 🔜 v0.3.0 | Local KVM/libvirt VMs |
+| vSphere | 📋 Backlog | VMware vSphere integration |
+| OpenStack | 📋 Backlog | OpenStack integration |
+
+Contributions welcome!
 
 ## License
 MIT

@@ -54,8 +54,28 @@ def plan():
 
 
 @app.command()
-def install_cluster():
+def install_cluster(dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be installed without actually installing")):
     cfg = load_config()
+    
+    if dry_run:
+        console.print("[bold cyan]=== PrivateCloud Dry Run ===[/bold cyan]")
+        console.print(f"\n[bold]Cluster:[/bold] {cfg.cluster_name}")
+        console.print(f"[bold]K3s Version:[/bold] {cfg.k3s_version}")
+        console.print(f"[bold]Provider:[/bold] {cfg.provider}")
+        console.print("\n[bold]Nodes to install:[/bold]")
+        for n in cfg.nodes:
+            console.print(f"  - {n.user}@{n.host}:{n.port} (role: {n.role})")
+        console.print("\n[bold]Services to be installed:[/bold]")
+        console.print("  - K3s Kubernetes")
+        if cfg.enable_monitoring:
+            console.print("  - Prometheus + Grafana (monitoring)")
+        if cfg.enable_ingress:
+            console.print("  - Ingress NGINX")
+        if cfg.enable_storage:
+            console.print("  - Longhorn (storage)")
+        console.print("\n[green]This is a dry run. No changes were made.[/green]")
+        return
+    
     install(cfg)
 
 
