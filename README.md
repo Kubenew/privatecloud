@@ -4,52 +4,47 @@
 
 It focuses on **fast deployment**, **repeatable infrastructure**, and **production-ready defaults**.
 
-## v0.3.0 Release Notes
+---
 
-### New Features
+## Features Overview (v0.6.0)
 
-**Web-based GUI Dashboard**
-- Start with `privatecloud gui --port 8080`
-- View cluster health (nodes, pods)
-- One-click backup/restore
-- Safe cluster destruction
-
-**Backup & Restore**
-- `privatecloud backup create` - Creates full backup to `backups/` directory
-- `privatecloud backup list` - Lists all available backups
-- `privatecloud backup restore <name>` - Restores from backup
-- `privatecloud backup delete <name>` - Deletes a backup
-- Backups include: namespace manifests, Terraform state, kubeconfig, privatecloud.yaml
-
-**Security Hardening**
-- Automatic `.gitignore` generation on `privatecloud init`
-- Secret masking in logs and output
-- Environment variable support for secrets (`${VAR}` syntax)
-- File permission warnings for config files
-
-**Enhanced Destroy Command**
-- `--yes` flag for non-interactive use
-- `--dry-run` to preview destruction
-- `--backup/--no-backup` to control pre-destruction backup
-- Auto-backup before destruction (configurable)
-
-## Features
-
+### Deployment
 - **Provider abstraction** — bare-metal SSH or Proxmox VE via Terraform
 - **Terraform runner** — generates, applies, and destroys infrastructure automatically
-- **Config auto-write** — Terraform outputs (node IPs) are written back to `privatecloud.yaml`
-- **Helm-based service installation** — all services deployed natively via Helm charts
-- **Automated teardown** — `privatecloud destroy` removes cloud-provisioned clusters
-- **Backup & Restore** — full cluster state backup and recovery
-- **Web GUI** — visual dashboard for cluster management
-- **Security features** — secret masking, env var support, .gitignore generation
-- Installs **K3s Kubernetes** on master + worker nodes
-- Deploys production services:
-  - Ingress NGINX
-  - cert-manager
-  - MetalLB
-  - Prometheus + Grafana (monitoring)
-  - Longhorn (storage)
+- **Config auto-write** — Terraform outputs (node IPs) written back to `privatecloud.yaml`
+- **Helm-based service installation** — all services deployed via Helm charts
+
+### Cluster Management
+- **Cluster upgrade** — `privatecloud upgrade v1.30.0+k3s1`
+- **Multi-cluster** — manage multiple clusters with `cluster list/add/switch/remove`
+- **HA setup** — high availability with multiple masters
+- **Add-on marketplace** — one-command install of common tools
+
+### Backup & Restore
+- **Local backups** — full cluster state to `backups/` directory
+- **Encrypted backups** — age encryption with `--encrypt`
+- **Cloud storage** — S3, GCS, Azure Blob integration
+- **Scheduled backups** — cron/systemd timers with `backup schedule`
+- **etcd snapshots** — `backup create --etcd-snapshot`
+- **Longhorn PITR** — snapshots and point-in-time restore
+
+### Security
+- **GUI authentication** — `--auth` flag with env var credentials
+- **Secret masking** — tokens/passwords masked in logs
+- **Environment variables** — `${VAR}` syntax for secrets
+- **Auto .gitignore** — prevents accidental secret commits
+
+### GUI Dashboard
+- **Web UI** — `privatecloud gui --port 8080`
+- **Cluster metrics** — nodes, pods, health status
+- **One-click actions** — backup, restore, destroy
+
+### Operations
+- **Diagnostics** — `privatecloud doctor --diagnostics`
+- **Configuration linting** — `privatecloud lint`
+- **Release notes** — `privatecloud release-notes`
+
+---
 
 ## Requirements
 
@@ -62,8 +57,9 @@ It focuses on **fast deployment**, **repeatable infrastructure**, and **producti
 | helm | ✅ |
 | kubectl | optional |
 | flask | for GUI |
+| age | for backup encryption |
 
-Run `privatecloud doctor` to verify your system.
+---
 
 ## Install
 
@@ -71,35 +67,54 @@ Run `privatecloud doctor` to verify your system.
 pip install privatecloud
 ```
 
+---
+
 ## Quickstart
 
 ```bash
 # Initialize
-privatecloud init                    # generate privatecloud.yaml and .gitignore
-privatecloud doctor                  # check dependencies
+privatecloud init                      # generate privatecloud.yaml
+privatecloud doctor --diagnostics      # check dependencies and cluster health
+privatecloud lint                      # validate config
 
 # Deploy
-privatecloud plan                    # preview the install plan
-privatecloud install-cluster         # deploy everything
-privatecloud install-cluster --dry-run  # preview without changes
+privatecloud plan                      # preview the install plan
+privatecloud install-cluster           # deploy everything
+privatecloud install-cluster --dry-run # preview without changes
 
 # Manage
-privatecloud gui --port 8080         # start web dashboard
-privatecloud backup create            # create backup
-privatecloud backup list             # list backups
-privatecloud backup restore <name>    # restore from backup
+privatecloud gui --port 8080           # start web dashboard
+privatecloud upgrade v1.30.0+k3s1     # upgrade cluster
+privatecloud cluster list              # list managed clusters
+
+# Backup & Restore
+privatecloud backup create                         # create backup
+privatecloud backup create --encrypt              # encrypted backup
+privatecloud backup create --s3 my-bucket        # upload to S3
+privatecloud backup create --etcd-snapshot       # include etcd
+privatecloud backup schedule daily --keep 7       # schedule backups
+privatecloud backup list                          # list backups
+privatecloud backup restore <name>               # restore backup
+privatecloud backup restore <name> --force       # force restore
+
+# Snapshots & PITR
+privatecloud snapshot my-volume                   # create snapshot
+privatecloud snapshots-list                      # list all snapshots
+privatecloud restore my-volume snap-123          # restore from snapshot
+
+# Add-ons
+privatecloud addon list                           # list available add-ons
+privatecloud addon install monitoring-stack       # install add-on
+privatecloud addon search logging                 # search add-ons
 
 # Destroy
-privatecloud destroy                 # tear down (with backup prompt)
-privatecloud destroy --yes          # skip confirmation
+privatecloud destroy                             # with backup prompt
+privatecloud destroy --yes                        # skip confirmation
 ```
 
-## Config File
+---
 
-> **⚠️ DO NOT COMMIT `privatecloud.yaml` OR YOUR TERRAFORM DIRECTORY TO GIT.**
-> Your configuration contains secrets (e.g. Proxmox API tokens). A `.gitignore` is auto-generated on `privatecloud init`.
-
-Created automatically by `privatecloud init`:
+## Configuration
 
 ```yaml
 cluster_name: my-private-cloud
@@ -122,8 +137,6 @@ proxmox:
   template: ubuntu-2204-template
   master_count: 1
   worker_count: 2
-  storage: local-lvm
-  bridge: vmbr0
 
 services:
   metallb: true
@@ -133,35 +146,7 @@ services:
   longhorn: true
 ```
 
-## Security
-
-### Use Environment Variables for Secrets
-
-```bash
-export PROXMOX_TOKEN="your-secret-token"
-privatecloud install-cluster
-```
-
-In config, reference with `${VAR_NAME}` syntax:
-```yaml
-proxmox:
-  token_secret: "${PROXMOX_TOKEN}"
-```
-
-### Protect Your Config File
-
-```bash
-chmod 600 privatecloud.yaml
-```
-
-### Auto-generated .gitignore
-
-`privatecloud init` automatically creates `.gitignore` with:
-- `privatecloud.yaml`
-- `terraform/*.tfstate*`
-- `backups/`
-- `kubeconfig`
-- Other sensitive files
+---
 
 ## Provider Modules Roadmap
 
@@ -169,24 +154,29 @@ chmod 600 privatecloud.yaml
 |----------|--------|-------------|
 | Bare-metal | ✅ Stable | Direct SSH installation |
 | Proxmox | ✅ v0.2.0 | Proxmox VE via Terraform |
-| Hetzner | 🔜 v0.4.0 | Hetzner Cloud API |
-| LibVirt | 🔜 v0.4.0 | Local KVM/libvirt VMs |
+| Hetzner | 🔜 v0.7.0 | Hetzner Cloud API |
+| LibVirt | 🔜 v0.7.0 | Local KVM/libvirt VMs |
 | vSphere | 📋 Backlog | VMware vSphere integration |
 | OpenStack | 📋 Backlog | OpenStack integration |
 
+---
+
 ## Roadmap
 
-### v0.4.0
-- [ ] Rolling cluster upgrades (`privatecloud upgrade`)
-- [ ] Idempotent installation (re-running skips completed tasks)
+### v0.7.0
 - [ ] Hetzner Cloud provider
-- [ ] LibVirt/KVM provider
+- [ ] LibVirt/KVM provider  
+- [ ] Cluster backup verification
+- [ ] Rollback from failed upgrade
 
 ### v1.0 (Production Ready)
-- [ ] High-availability K3s with external DB
-- [ ] Built-in etcd backup
-- [ ] Add-on marketplace (logging, service mesh)
-- [ ] Multi-cluster management
+- [ ] High-availability k3s with external DB
+- [ ] Rolling cluster upgrades
+- [ ] Multi-cluster management UI
+- [ ] Add-on marketplace with 20+ tools
+- [ ] Cloud storage backup with lifecycle policies
+
+---
 
 ## Contributing
 

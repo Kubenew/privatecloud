@@ -24,6 +24,13 @@ from .upgrade import upgrade_cluster, get_current_k3s_version, get_cluster_nodes
 from .multicluster import list_clusters, add_cluster, remove_cluster, switch_cluster, get_cluster_info
 from .addons import AddonManager, list_available_addons, search_addons
 from .validate import print_validation_report, lint_config
+from .high_availability import create_ha_config, get_cluster_health_ha, validate_ha_setup
+from .pitr import (
+    check_longhorn_available, get_volumes, get_snapshots, 
+    create_volume_snapshot, restore_from_snapshot, delete_old_snapshots,
+    create_pvc_from_snapshot, list_snapshots_with_volumes
+)
+from .changelog import generate_release_notes, write_changelog, get_version_from_pyproject
 
 app = typer.Typer(help="PrivateCloud: one-command private cloud installer.")
 console = Console()
@@ -457,4 +464,113 @@ def lint(
 ):
     """Validate configuration file."""
     print_validation_report(path)
+
+
+@app.command()
+def snapshot(
+    volume: str = typer.Argument(..., help="Volume name"),
+    namespace: str = typer.Option("longhorn-system", "--namespace", "-n", help="Namespace"),
+):
+    """Create a Longhorn volume snapshot."""
+    name = create_volume_snapshot(volume, namespace)
+    if name:
+        console.print(f"[green]✅ Snapshot created: {name}[/green]")
+    else:
+        console.print("[red]❌ Failed to create snapshot[/red]")
+
+
+@app.command()
+def restore(
+    volume: str = typer.Argument(..., help="Volume name"),
+    snapshot_name: str = typer.Argument(..., help="Snapshot name"),
+    new_name: str = typer.Option(None, "--name", help="New volume name"),
+    namespace: str = typer.Option("longhorn-system", "--namespace", "-n", help="Namespace"),
+):
+    """Restore volume from Longhorn snapshot."""
+    if restore_from_snapshot(volume, snapshot_name, new_name, namespace):
+        console.print(f"[green]✅ Restore initiated[/green]")
+    else:
+        console.print("[red]❌ Restore failed[/red]")
+
+
+@app.command()
+def snapshots_list(
+    volume: str = typer.Option(None, "--volume", help="Filter by volume name"),
+    namespace: str = typer.Option("longhorn-system", "--namespace", "-n", help="Namespace"),
+):
+    """List Longhorn volume snapshots."""
+    if not check_longhorn_available():
+        console.print("[yellow]Longhorn not installed[/yellow]")
+        return
+    
+    if volume:
+        snaps = get_snapshots(volume, namespace)
+        console.print(f"[cyan]Snapshots for {volume}:[/cyan]")
+        for s in snaps:
+            console.print(f"  - {s['name']} ({s['created'][:10]})")
+    else:
+        all_volumes = list_snapshots_with_volumes()
+        table = Table(title="Volumes & Snapshots")
+        table.add_column("Volume", style="cyan")
+        table.add_column("Namespace", style="dim")
+        table.add_column("State", justify="center")
+        table.add_column("Snapshots", justify="right")
+        for v in all_volumes:
+            table.add_row(v['volume'], v['namespace'], v['state'], str(v['snapshot_count']))
+        console.print(table)
+
+
+@app.command()
+def ha(
+    action: str = typer.Argument(..., help="Action: status, setup"),
+    master_ips: str = typer.Option("", "--masters", help="Comma-separated master IPs"),
+    worker_ips: str = typer.Option("", "--workers", help="Comma-separated worker IPs"),
+):
+    """High availability cluster operations."""
+    if action == "status":
+        status = get_cluster_health_ha()
+        if status.get('healthy'):
+            console.print(f"[green]✅ HA Status: {status.get('ha_status')}[/green]")
+            console.print(f"Masters: {status['masters']['ready']}/{status['masters']['total']} ready")
+            console.print(f"Workers: {status['workers']['ready']}/{status['workers']['total']} ready")
+        else:
+            console.print(f"[red]❌ HA Status: {status.get('error', 'unhealthy')}[/red]")
+    elif action == "setup":
+        masters = [m.strip() for m in master_ips.split(',') if m.strip()]
+        workers = [w.strip() for w in worker_ips.split(',') if w.strip()]
+        
+        if len(masters) < 2:
+            console.print("[red]❌ Need at least 2 master IPs for HA[/red]")
+            return
+        
+        warnings = validate_ha_setup(len(masters), "embedded")
+        for w in warnings:
+            console.print(f"[yellow]⚠️  {w}[/yellow]")
+        
+        from pathlib import Path
+        output = Path("ha-setup")
+        files = create_ha_config(output, masters, workers)
+        
+        console.print(f"[green]✅ HA config created in {output}/[/green]")
+        console.print(f"  - {files['masters'].name} - Master install script")
+        console.print(f"  - {files['workers'].name} - Worker join script")
+        console.print(f"  - {files['config'].name} - Configuration")
+
+
+@app.command()
+def changelog_update():
+    """Update CHANGELOG.md from git history."""
+    write_changelog()
+    console.print("[green]✅ CHANGELOG.md updated[/green]")
+
+
+@app.command()
+def release_notes(
+    version: str = typer.Argument(None, help="Version number (auto-detected if omitted)"),
+):
+    """Generate release notes for current version."""
+    if not version:
+        version = f"v{get_version_from_pyproject()}"
+    notes = generate_release_notes(version)
+    console.print(notes)
 
