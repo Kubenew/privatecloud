@@ -35,16 +35,33 @@ You can update your installation using pip:
 bash
 pip install privatecloud==0.2.0
 
-## Features (v0.1.0)
-- Installs **K3s Kubernetes**
-- Installs base cloud services (framework skeleton):
+## Features (v0.2.0)
+
+- **Provider abstraction** — bare-metal SSH or Proxmox VE via Terraform
+- **Terraform runner** — generates, applies, and destroys infrastructure automatically
+- **Config auto-write** — Terraform outputs (node IPs) are written back to `privatecloud.yaml`
+- **Helm-based service installation** — all services deployed natively via Helm charts
+- **Automated teardown** — `privatecloud destroy` removes cloud-provisioned clusters
+- Installs **K3s Kubernetes** on master + worker nodes
+- Deploys production services:
   - Ingress NGINX
   - cert-manager
   - MetalLB
   - Prometheus + Grafana (monitoring)
   - Longhorn (storage)
-- Generates install plan + executes scripts
-- Works via SSH (bare-metal / VM)
+
+## Requirements
+
+| Tool | Required |
+|------|----------|
+| Python 3.9+ | ✅ |
+| ssh / scp | ✅ |
+| curl | ✅ |
+| terraform | ✅ |
+| helm | ✅ |
+| kubectl | optional |
+
+Run `privatecloud doctor` to verify your system.
 
 ## Install
 
@@ -55,28 +72,42 @@ pip install privatecloud
 ## Quickstart
 
 ```bash
-privatecloud init
-privatecloud doctor
-privatecloud plan
-privatecloud install-cluster
+privatecloud init          # generate privatecloud.yaml
+privatecloud doctor        # check dependencies
+privatecloud plan          # preview the install plan
+privatecloud install-cluster          # deploy everything
+privatecloud install-cluster --dry-run  # preview without changes
+privatecloud destroy       # tear down (Terraform providers only)
 ```
 
 ## Config File
 
-Created automatically:
-
-`privatecloud.yaml`
-
-Example:
+Created automatically by `privatecloud init`:
 
 ```yaml
 cluster_name: my-private-cloud
+provider: bare-metal          # or "proxmox"
+k3s_version: v1.29.0+k3s1
+
 nodes:
   - host: 192.168.1.10
     user: root
+    role: master
   - host: 192.168.1.11
     user: root
-k3s_version: v1.29.0+k3s1
+    role: worker
+
+proxmox:
+  url: https://192.168.1.100:8006/api2/json
+  token_id: root@pam!mytoken
+  token_secret: your-secret-here
+  node: pve
+  template: ubuntu-2204-template
+  master_count: 1
+  worker_count: 2
+  storage: local-lvm
+  bridge: vmbr0
+
 services:
   metallb: true
   ingress_nginx: true
@@ -85,23 +116,15 @@ services:
   longhorn: true
 ```
 
-## Commands
-
-- `privatecloud init` - create config + folders
-- `privatecloud doctor` - check system dependencies
-- `privatecloud plan` - print install plan
-- `privatecloud install-cluster` - deploy private cloud stack
-- `privatecloud install-cluster --dry-run` - preview without installing
-- `privatecloud destroy` - placeholder (v0.2.0)
+> When `provider: proxmox`, nodes are provisioned dynamically via Terraform and their IPs are auto-written back into the config.
 
 ## Provider Modules Roadmap
 
-The following cloud providers are planned for future releases:
-
 | Provider | Status | Description |
 |----------|--------|-------------|
-| Proxmox | 🔜 v0.2.0 | Proxmox VE integration |
-| Hetzner | 🔜 v0.2.0 | Hetzner Cloud API |
+| Bare-metal | ✅ Stable | Direct SSH installation |
+| Proxmox | ✅ v0.2.0 | Proxmox VE via Terraform |
+| Hetzner | 🔜 v0.3.0 | Hetzner Cloud API |
 | LibVirt | 🔜 v0.3.0 | Local KVM/libvirt VMs |
 | vSphere | 📋 Backlog | VMware vSphere integration |
 | OpenStack | 📋 Backlog | OpenStack integration |
