@@ -20,6 +20,10 @@ from .backup import (
     pre_destroy_backup as do_pre_destroy_backup,
     download_from_remote, list_all_backups,
 )
+from .upgrade import upgrade_cluster, get_current_k3s_version, get_cluster_nodes, check_upgrade_available
+from .multicluster import list_clusters, add_cluster, remove_cluster, switch_cluster, get_cluster_info
+from .addons import AddonManager, list_available_addons, search_addons
+from .validate import print_validation_report, lint_config
 
 app = typer.Typer(help="PrivateCloud: one-command private cloud installer.")
 console = Console()
@@ -314,4 +318,143 @@ def gui(
     except ImportError as e:
         console.print(f"[red]Flask not installed. Run: pip install flask[/red]")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def upgrade(
+    version: str = typer.Argument(..., help="Target K3s version (e.g., v1.30.0+k3s1)"),
+    backup: bool = typer.Option(True, "--backup/--no-backup", help="Create backup before upgrade"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview upgrade without changes"),
+):
+    """Upgrade Kubernetes cluster to a new version."""
+    current = get_current_k3s_version()
+    if current:
+        console.print(f"[cyan]Current version: {current}[/cyan]")
+    console.print(f"[cyan]Target version: {version}[/cyan]")
+    
+    if upgrade_cluster(version, backup=backup, dry_run=dry_run):
+        if dry_run:
+            console.print("[yellow]Dry run complete[/yellow]")
+        else:
+            console.print(f"[green]✅ Cluster upgrade to {version} initiated[/green]")
+    else:
+        console.print("[red]❌ Upgrade failed[/red]")
+        raise typer.Exit(code=1)
+
+
+cluster_group = typer.Typer(help="Multi-cluster management.")
+app.add_typer(cluster_group, name="cluster")
+
+
+@cluster_group.command(name="list")
+def cluster_list():
+    """List all managed clusters."""
+    clusters = list_clusters()
+    if clusters:
+        table = Table(title="Managed Clusters")
+        table.add_column("Name", style="cyan")
+        table.add_column("Provider", style="dim")
+        table.add_column("Current", justify="center")
+        for c in clusters:
+            table.add_row(c.name, c.provider, "✅" if c.current else "")
+        console.print(table)
+    else:
+        console.print("[yellow]No clusters managed. Add with 'privatecloud cluster add'[/yellow]")
+
+
+@cluster_group.command()
+def add(
+    name: str = typer.Argument(..., help="Cluster name"),
+    kubeconfig: str = typer.Argument(..., help="Path to kubeconfig file"),
+    provider: str = typer.Option("unknown", "--provider", help="Cluster provider"),
+):
+    """Add a cluster to management."""
+    if add_cluster(name, kubeconfig, provider=provider):
+        console.print(f"[green]✅ Cluster '{name}' added[/green]")
+    else:
+        console.print("[red]❌ Failed to add cluster[/red]")
+
+
+@cluster_group.command()
+def switch(name: str = typer.Argument(..., help="Cluster name")):
+    """Switch to a different cluster."""
+    if switch_cluster(name):
+        console.print(f"[green]✅ Switched to cluster '{name}'[/green]")
+    else:
+        console.print("[red]❌ Failed to switch cluster[/red]")
+
+
+@cluster_group.command()
+def remove(name: str = typer.Argument(..., help="Cluster name")):
+    """Remove a cluster from management."""
+    if remove_cluster(name):
+        console.print(f"[green]✅ Cluster '{name}' removed[/green]")
+    else:
+        console.print("[red]❌ Failed to remove cluster[/red]")
+
+
+addon_group = typer.Typer(help="Add-on marketplace.")
+app.add_typer(addon_group, name="addon")
+
+
+@addon_group.command(name="list")
+def addon_list(installed: bool = typer.Option(False, "--installed", help="Show only installed")):
+    """List available add-ons."""
+    manager = AddonManager()
+    addons = manager.list_addons(installed_only=installed)
+    
+    if addons:
+        table = Table(title="Add-ons")
+        table.add_column("Name", style="cyan")
+        table.add_column("Category", style="dim")
+        table.add_column("Status", justify="center")
+        table.add_column("Description")
+        for a in addons:
+            status = "✅" if a['installed'] else "⬜"
+            table.add_row(a['name'], a['category'], status, a['description'][:50])
+        console.print(table)
+    else:
+        console.print("[yellow]No add-ons found[/yellow]")
+
+
+@addon_group.command()
+def install(
+    name: str = typer.Argument(..., help="Add-on name"),
+):
+    """Install an add-on."""
+    manager = AddonManager()
+    if manager.install_addon(name):
+        console.print(f"[green]✅ Add-on '{name}' installed[/green]")
+    else:
+        console.print("[red]❌ Installation failed[/red]")
+
+
+@addon_group.command()
+def uninstall(name: str = typer.Argument(..., help="Add-on name")):
+    """Uninstall an add-on."""
+    manager = AddonManager()
+    if manager.uninstall_addon(name):
+        console.print(f"[green]✅ Add-on '{name}' uninstalled[/green]")
+    else:
+        console.print("[red]❌ Uninstallation failed[/red]")
+
+
+@addon_group.command()
+def search(query: str = typer.Argument(..., help="Search term")):
+    """Search for add-ons."""
+    results = search_addons(query)
+    if results:
+        console.print(f"[cyan]Found {len(results)} add-ons:[/cyan]")
+        for a in results:
+            console.print(f"  • {a['name']} - {a['description']}")
+    else:
+        console.print("[yellow]No add-ons found[/yellow]")
+
+
+@app.command()
+def lint(
+    path: str = typer.Option("privatecloud.yaml", "--config", help="Config file to lint"),
+):
+    """Validate configuration file."""
+    print_validation_report(path)
 
