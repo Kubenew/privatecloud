@@ -1,0 +1,19 @@
+site_name: PrivateCloud
+site_description: One-command Kubernetes private cloud installer
+site_url: https://Kubenew.github.io/PrivateCloud
+repo_name: Kubenew/PrivateCloud
+repo_url: https://github.com/Kubenew/PrivateCloud
+
+theme:
+  name: material
+  palette:
+    primary: blue
+    accent: light blue
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Usage: usage.md
+
+plugins:
+  - search

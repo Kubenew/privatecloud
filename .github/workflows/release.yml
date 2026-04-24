@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version'
+        required: true
+        default: '0.1.0'
+      changelog:
+        description: 'Changelog'
+        required: true
+        default: '- Initial release'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          release_name: PrivateCloud v${{ github.event.inputs.version }}
+          body: |
+            ## Changelog
+            ${{ github.event.inputs.changelog }}
+
+            ```bash
+            pip install privatecloud
+            ```
+          draft: false
