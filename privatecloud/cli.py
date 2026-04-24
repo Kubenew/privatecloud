@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 
 from .doctor import check_tools, display_diagnostics
+from .scheduler import schedule_backup, remove_schedule, get_schedule_status
 from .utils import save_default_config, load_config, save_config
 from .installer import install
 from .terraform import apply_and_update_config, terraform_destroy
@@ -17,6 +18,7 @@ from .backup import (
     delete_backup as do_delete_backup,
     verify_backup as do_verify_backup,
     pre_destroy_backup as do_pre_destroy_backup,
+    download_from_remote, list_all_backups,
 )
 
 app = typer.Typer(help="PrivateCloud: one-command private cloud installer.")
@@ -190,24 +192,44 @@ def create(
     encrypt: bool = typer.Option(False, "--encrypt", help="Encrypt backup with passphrase"),
     passphrase: str = typer.Option(None, "--passphrase", help="Encryption passphrase (or use PRIVATECLOUD_BACKUP_PASS env var)"),
     keep_last: int = typer.Option(None, "--keep-last", help="Number of Longhorn snapshots to keep"),
+    s3_bucket: str = typer.Option(None, "--s3", help="Upload to S3 bucket"),
+    gcs_bucket: str = typer.Option(None, "--gcs", help="Upload to GCS bucket"),
+    azure_container: str = typer.Option(None, "--azure", help="Upload to Azure container"),
+    etcd_snapshot: bool = typer.Option(False, "--etcd-snapshot", help="Include etcd snapshot"),
 ):
     """Create a new backup."""
-    result = do_backup(name, encrypt=encrypt, passphrase=passphrase, keep_last=keep_last)
+    result = do_backup(name, encrypt=encrypt, passphrase=passphrase, keep_last=keep_last,
+                       s3_bucket=s3_bucket, gcs_bucket=gcs_bucket, azure_container=azure_container,
+                       etcd_snapshot=etcd_snapshot)
     if result:
         console.print(f"[green]✅ Backup created: {result}[/green]")
 
 
 @backup_group.command()
-def list():
+def list(
+    s3_bucket: str = typer.Option(None, "--s3", help="List backups in S3 bucket"),
+    azure_container: str = typer.Option(None, "--azure", help="List backups in Azure container"),
+    remote_only: bool = typer.Option(False, "--remote-only", help="Show only remote backups"),
+):
     """List all backups."""
-    backups = do_list_backups()
+    if s3_bucket or azure_container:
+        backups = list_all_backups(s3_bucket=s3_bucket, azure_container=azure_container)
+    else:
+        backups = do_list_backups()
+    
     if backups:
         table = Table(title="Available Backups")
         table.add_column("Name", style="cyan")
         table.add_column("Size (KB)", justify="right")
         table.add_column("Encrypted", justify="center")
+        table.add_column("Storage", style="dim")
         for b in backups:
-            table.add_row(b["name"], str(b["size"]), "🔐" if b["encrypted"] else "")
+            table.add_row(
+                b["name"], 
+                str(b["size"]), 
+                "🔐" if b.get("encrypted") else "",
+                b.get("storage", "local")
+            )
         console.print(table)
     else:
         console.print("[yellow]No backups found[/yellow]")
@@ -251,6 +273,27 @@ def delete(backup_name: str = typer.Argument(..., help="Backup name to delete"))
         console.print(f"[green]✅ Deleted backup: {backup_name}[/green]")
     else:
         console.print(f"[red]❌ Backup not found: {backup_name}[/red]")
+
+
+@backup_group.command(name="schedule")
+def schedule(
+    interval: str = typer.Argument(..., help="Schedule interval (hourly, daily, weekly, monthly)"),
+    keep: int = typer.Option(7, "--keep", help="Number of backups to keep"),
+    encrypt: bool = typer.Option(False, "--encrypt", help="Encrypt backups"),
+    remove: bool = typer.Option(False, "--remove", help="Remove scheduled backup"),
+):
+    """Schedule automatic backups."""
+    if remove:
+        if remove_schedule():
+            console.print("[green]✅ Scheduled backup removed[/green]")
+        else:
+            console.print("[red]❌ Failed to remove schedule[/red]")
+        return
+    
+    if schedule_backup(interval, keep, encrypt):
+        console.print(f"[green]✅ Scheduled {interval} backups (keeping {keep})[/green]")
+    else:
+        console.print("[red]❌ Failed to schedule backups[/red]")
 
 
 @app.command()

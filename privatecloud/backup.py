@@ -8,6 +8,14 @@ from pathlib import Path
 import shutil
 import sys
 
+from .cloud_storage import (
+    upload_to_s3, download_from_s3, list_s3_backups, delete_from_s3,
+    upload_to_gcs, download_from_gcs, 
+    upload_to_azure, download_from_azure, list_azure_blobs,
+    check_s3_configured, check_gcs_configured, check_azure_configured,
+)
+from .etcd import create_etcd_snapshot
+
 BACKUP_ROOT = Path("backups")
 
 
@@ -33,7 +41,9 @@ def run_cmd(cmd, check=False, capture=True, timeout=30):
         return type('obj', (object,), {'returncode': 1, 'stdout': '', 'stderr': str(e)})()
 
 
-def create_backup(name=None, encrypt=False, passphrase=None, keep_last=None):
+def create_backup(name=None, encrypt=False, passphrase=None, keep_last=None,
+                  s3_bucket=None, gcs_bucket=None, azure_container=None,
+                  etcd_snapshot=False):
     ensure_backup_dir()
     if name is None:
         name = f"backup_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -82,6 +92,11 @@ def create_backup(name=None, encrypt=False, passphrase=None, keep_last=None):
     except Exception:
         pass
 
+    if etcd_snapshot:
+        etcd_path = create_etcd_snapshot(backup_dir=backup_path)
+        if etcd_path:
+            print(f"📸 etcd snapshot included in backup")
+
     tar_path = BACKUP_ROOT / f"{name}.tar.gz"
     with tarfile.open(tar_path, "w:gz") as tar:
         tar.add(backup_path, arcname=name)
@@ -94,6 +109,13 @@ def create_backup(name=None, encrypt=False, passphrase=None, keep_last=None):
             print(f"🔐 Backup encrypted: {tar_path}")
         else:
             print("⚠️  Encryption failed, keeping unencrypted backup")
+
+    if s3_bucket:
+        upload_to_s3(tar_path, s3_bucket)
+    if gcs_bucket:
+        upload_to_gcs(tar_path, gcs_bucket)
+    if azure_container:
+        upload_to_azure(tar_path, azure_container)
 
     print(f"✅ Backup saved: {tar_path}")
     return str(tar_path)
@@ -340,3 +362,39 @@ def pre_destroy_backup():
         print(f"⚠️  Pre-destroy backup saved to: {backup_dir}")
         return str(backup_dir)
     return None
+
+
+def download_from_remote(storage_type: str, bucket: str, key: str) -> Optional[str]:
+    if storage_type == 's3':
+        return download_from_s3(bucket, key)
+    elif storage_type == 'gcs':
+        return download_from_gcs(bucket, key)
+    elif storage_type == 'azure':
+        return download_from_azure(bucket, key)
+    return None
+
+
+def list_all_backups(s3_bucket=None, gcs_bucket=None, azure_container=None) -> List[Dict]:
+    backups = []
+    
+    local_backups = list_backups()
+    for b in local_backups:
+        backups.append({**b, 'storage': 'local'})
+    
+    if s3_bucket and check_s3_configured():
+        try:
+            s3_backups = list_s3_backups(s3_bucket)
+            for b in s3_backups:
+                backups.append({**b, 'bucket': s3_bucket})
+        except Exception as e:
+            print(f"⚠️  Failed to list S3 backups: {e}")
+    
+    if azure_container and check_azure_configured():
+        try:
+            azure_backups = list_azure_blobs(azure_container)
+            for b in azure_backups:
+                backups.append({**b, 'bucket': azure_container})
+        except Exception as e:
+            print(f"⚠️  Failed to list Azure backups: {e}")
+    
+    return sorted(backups, key=lambda x: x.get('modified', ''), reverse=True)

@@ -4,6 +4,7 @@
     <title>PrivateCloud Dashboard</title>
     <link rel="stylesheet" href="/static/style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,9 +15,41 @@
             <p>Loading...</p>
         </div>
 
+        <div class="metrics-section" id="metrics-section">
+            <h2>📊 Cluster Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Nodes</h3>
+                    <div class="metric-value" id="node-count">-</div>
+                    <div class="metric-label">Ready Nodes</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Pods</h3>
+                    <div class="metric-value" id="pod-count">-</div>
+                    <div class="metric-label">Running Pods</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Failed Pods</h3>
+                    <div class="metric-value" id="failed-pods">-</div>
+                    <div class="metric-label">Crashed Pods</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Longhorn</h3>
+                    <div class="metric-value" id="longhorn-status">-</div>
+                    <div class="metric-label">Healthy Volumes</div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>High Restart Pods</h3>
+                <ul id="high-restart-pods" class="pod-list"></ul>
+            </div>
+        </div>
+
         <div class="backup-section">
-            <h2>Backup & Restore</h2>
-            <button onclick="triggerBackup()">📦 Create Backup Now</button>
+            <h2>💾 Backup & Restore</h2>
+            <button onclick="triggerBackup()" class="btn-primary">📦 Create Backup Now</button>
+            <button onclick="refreshMetrics()" class="btn-secondary">🔄 Refresh</button>
             <h3>Available Backups</h3>
             <ul id="backup-list">
                 {% for backup in backups %}
@@ -31,12 +64,12 @@
 
         <div class="danger-section">
             <h2>⚠️ Danger Zone</h2>
-            <button onclick="triggerDestroy()">💀 Destroy Entire Cluster</button>
+            <button onclick="triggerDestroy()" class="btn-danger">💀 Destroy Entire Cluster</button>
         </div>
     </div>
 
     <script>
-        function refreshStatus() {
+        function getClusterStatus() {
             fetch('/api/status')
                 .then(r => r.json())
                 .then(data => {
@@ -55,6 +88,40 @@
                         <div class="status-item error">❌ Cannot connect to cluster</div>
                     `;
                 });
+        }
+
+        function refreshMetrics() {
+            fetch('/api/metrics')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.nodes) {
+                        document.getElementById('node-count').textContent = `${data.nodes.ready}/${data.nodes.total}`;
+                    }
+                    if (data.pods) {
+                        document.getElementById('pod-count').textContent = data.pods.running;
+                        document.getElementById('failed-pods').textContent = data.pods.failed;
+                        
+                        const highRestart = data.pods.items.filter(p => p.restarts > 5);
+                        const podList = document.getElementById('high-restart-pods');
+                        if (highRestart.length > 0) {
+                            podList.innerHTML = highRestart.map(p => 
+                                `<li class="warning-item">${p.namespace}/${p.name} (${p.restarts} restarts)</li>`
+                            ).join('');
+                        } else {
+                            podList.innerHTML = '<li class="ok-item">✅ No pods with high restart count</li>';
+                        }
+                    }
+                    if (data.longhorn && data.longhorn.available) {
+                        document.getElementById('longhorn-status').textContent = 
+                            `${data.longhorn.healthy}/${data.longhorn.volumes}`;
+                        if (data.longhorn.degraded > 0) {
+                            document.getElementById('longhorn-status').classList.add('error');
+                        }
+                    } else {
+                        document.getElementById('longhorn-status').textContent = 'N/A';
+                    }
+                })
+                .catch(err => console.log('Metrics error:', err));
         }
 
         function triggerBackup() {
@@ -84,8 +151,9 @@
             }
         }
 
-        refreshStatus();
-        setInterval(refreshStatus, 10000);
+        getClusterStatus();
+        refreshMetrics();
+        setInterval(() => { getClusterStatus(); refreshMetrics(); }, 15000);
     </script>
 </body>
 </html>

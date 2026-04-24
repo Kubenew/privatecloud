@@ -1,10 +1,11 @@
 import os
 import secrets
-import base64
-import functools
+import subprocess
+import json
 from flask import Flask, render_template, jsonify, request, session, abort
 
 from ..backup import list_backups as get_backup_list, create_backup as do_backup, restore_backup as do_restore
+from ..metrics import get_cluster_summary, get_node_metrics, get_pod_metrics, get_longhorn_metrics
 from ...cli import destroy
 
 app = Flask(__name__)
@@ -62,6 +63,11 @@ def logout():
 @app.route("/api/status")
 def api_status():
     return jsonify(get_cluster_status())
+
+
+@app.route("/api/metrics")
+def api_metrics():
+    return jsonify(get_cluster_summary())
 
 
 @app.route("/api/backup", methods=["POST"])
