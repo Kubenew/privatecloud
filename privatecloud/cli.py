@@ -87,7 +87,7 @@ def install_cluster(dry_run: bool = typer.Option(False, "--dry-run", help="Show 
     
     if cfg.provider != "bare-metal":
         console.print(f"[bold cyan]Provisioning nodes via Terraform ({cfg.provider})...[/bold cyan]")
-        cfg = apply_and_update_config(cfg)
+        cfg = apply_and_update_config(cfg, run_dir=cfg.terraform_dir)
         
     install(cfg)
 
@@ -100,7 +100,7 @@ def destroy():
         return
         
     console.print(f"[bold red]Destroying cluster {cfg.cluster_name}...[/bold red]")
-    terraform_destroy()
+    terraform_destroy(run_dir=cfg.terraform_dir)
     
     # Clear nodes list from config
     cfg.nodes = []
