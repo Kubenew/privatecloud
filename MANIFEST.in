@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+include privatecloud.yaml.example
+recursive-include privatecloud *.py

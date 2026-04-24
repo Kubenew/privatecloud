@@ -1,0 +1,15 @@
+cluster_name: my-private-cloud
+k3s_version: v1.29.0+k3s1
+
+nodes:
+  - host: 192.168.1.10
+    user: root
+  - host: 192.168.1.11
+    user: root
+
+services:
+  metallb: true
+  ingress_nginx: true
+  cert_manager: true
+  monitoring: true
+  longhorn: true
