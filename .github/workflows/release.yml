@@ -1,33 +1,135 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
         description: 'Version'
         required: true
-        default: '0.1.0'
-      changelog:
-        description: 'Changelog'
-        required: true
-        default: '- Initial release'
+        default: '0.7.0'
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check package
+        run: twine check dist/*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  test-pypi:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install from Test PyPI
+        run: |
+          pip install --index-url https://test.pypi.org/simple/ privatecloud
+
+      - name: Verify version
+        run: python -c "import privatecloud; print(f'Version: {privatecloud.__version__}')"
+
+  publish-pypi:
+    runs-on: ubuntu-latest
+    needs: test-pypi
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist/*
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: publish-pypi
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - uses: softprops/action-gh-release@v1
+
+      - name: Get version from tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version: $VERSION"
+
+      - name: Generate release notes
+        run: |
+          python -m privatecloud release-notes v$VERSION || echo "Release notes generation skipped"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.event.inputs.version }}
-          release_name: PrivateCloud v${{ github.event.inputs.version }}
+          tag_name: ${{ github.ref_name }}
+          release_name: PrivateCloud v${{ env.VERSION }}
           body: |
-            ## Changelog
-            ${{ github.event.inputs.changelog }}
+            ## Installation
 
             ```bash
-            pip install privatecloud
+            pip install privatecloud==${{ env.VERSION }}
             ```
+
+            ## Upgrade
+
+            ```bash
+            pip install --upgrade privatecloud
+            ```
+
+            ## New Features
+
+            - High Availability (HA) cluster support
+            - Point-in-Time Recovery (PITR) for Longhorn
+            - Release tooling and changelog generator
+            - Full CLI reference in README
+
+            See [CHANGELOG.md](CHANGELOG.md) for full history.
           draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/*.whl
+          asset_name: privatecloud-${{ env.VERSION }}-py3-none-any.whl
+          asset_content_type: application/octet-stream

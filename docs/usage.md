@@ -1,85 +1,110 @@
-# Usage
+# PrivateCloud v0.7.0 - Usage Guide
 
-## Initialize configuration
+## Installation
 
 ```bash
+pip install privatecloud==0.7.0
+```
+
+---
+
+## Quickstart
+
+```bash
+# 1. Initialize
 privatecloud init
+
+# 2. Verify
+privatecloud doctor --diagnostics
+
+# 3. Deploy
+privatecloud install-cluster
+
+# 4. Dashboard
+privatecloud gui --port 8080 --auth
 ```
 
-This creates a `privatecloud.yaml` file in the current directory with sensible defaults.
+---
 
-## Check dependencies
+## Cluster Management
 
+### Upgrade
 ```bash
-privatecloud doctor
+privatecloud upgrade v1.30.0+k3s1 --dry-run
+privatecloud upgrade v1.30.0+k3s1 --backup
 ```
 
-## Preview the plan
+### High Availability
+```bash
+privatecloud ha status
+privatecloud ha setup --masters IP1,IP2,IP3 --workers IP4,IP5
+```
+
+### Multi-Cluster
+```bash
+privatecloud cluster list/add/switch/remove
+```
+
+---
+
+## Backup & Recovery
+
+### Basic
+```bash
+privatecloud backup create
+privatecloud backup create --encrypt
+privatecloud backup create --s3 my-bucket
+```
+
+### Schedule
+```bash
+privatecloud backup schedule daily --keep 7
+```
+
+### Restore
+```bash
+privatecloud backup restore <name> --force
+```
+
+### Point-in-Time
+```bash
+privatecloud snapshot <volume>
+privatecloud restore <volume> <snapshot>
+privatecloud snapshots-list
+```
+
+---
+
+## Add-ons
 
 ```bash
+privatecloud addon list/install/uninstall/search
+```
+
+---
+
+## Configuration
+
+```bash
+privatecloud lint
 privatecloud plan
 ```
 
-Displays the cluster name, provider, K3s version, node list, and enabled services.
+---
 
-## Install the cluster
+## Complete CLI Reference
 
-```bash
-privatecloud install-cluster
-```
-
-This will:
-
-1. **Provision nodes** (if using a Terraform-managed provider like `proxmox`)
-2. **Install K3s** on the master node via SSH
-3. **Join workers** to the cluster
-4. **Fetch kubeconfig** from the master
-5. **Deploy services** via Helm (Ingress NGINX, cert-manager, MetalLB, monitoring, Longhorn)
-
-### Dry run
-
-```bash
-privatecloud install-cluster --dry-run
-```
-
-Preview which services would be installed without making any changes.
-
-## Destroy the cluster
-
-```bash
-privatecloud destroy
-```
-
-For Terraform-managed providers (`proxmox`), this runs `terraform destroy` and clears the node list from your configuration file.
-
-> **Note:** Destroy is only supported for cloud providers managed by Terraform. Bare-metal nodes must be cleaned up manually.
-
-## Using the Proxmox provider
-
-1. Set `provider: proxmox` in your `privatecloud.yaml`
-2. Configure the `proxmox:` block with your API credentials and VM settings
-3. Run `privatecloud install-cluster`
-
-Terraform will provision the VMs and automatically write the node IPs back into your config file.
-
-```yaml
-provider: proxmox
-proxmox:
-  url: https://proxmox.example.com:8006/api2/json
-  token_id: root@pam!mytoken
-  token_secret: your-secret
-  node: pve
-  template: ubuntu-2204-template
-  master_count: 1
-  worker_count: 2
-  storage: local-lvm
-  bridge: vmbr0
-```
-
-## After installation
-
-```bash
-export KUBECONFIG=./kubeconfig.yaml
-kubectl get nodes
-kubectl get pods -A
-```
+| Command | Description |
+|---------|-------------|
+| `init` | Generate config |
+| `doctor` | Check deps |
+| `plan` | Preview config |
+| `install-cluster` | Deploy |
+| `upgrade` | Upgrade K8s |
+| `ha` | HA management |
+| `backup` | Backup ops |
+| `snapshot` | PITR |
+| `cluster` | Multi-cluster |
+| `addon` | Marketplace |
+| `gui` | Web UI |
+| `lint` | Validate |

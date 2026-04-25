@@ -1,0 +1,61 @@
+# PrivateCloud S3 Backup Configuration Example
+#
+# Configure automated backups to AWS S3
+
+cluster_name: backup-demo
+provider: bare-metal
+k3s_version: v1.30.0+k3s1
+
+nodes:
+  - host: 192.168.1.10
+    user: root
+    role: master
+  - host: 192.168.1.11
+    user: root
+    role: worker
+  - host: 192.168.1.12
+    user: root
+    role: worker
+
+services:
+  metallb: true
+  ingress_nginx: true
+  cert_manager: true
+  monitoring: true
+  longhorn: true
+
+# AWS S3 Configuration
+backup:
+  # Enable backup
+  enabled: true
+  
+  # Local backup settings
+  local:
+    path: ./backups
+    keep_last: 7
+  
+  # S3 cloud storage
+  s3:
+    enabled: true
+    bucket: privatecloud-backups
+    region: us-east-1
+    prefix: clusters/production
+    # Optional: lifecycle policy (days before moving to glacier)
+    lifecycle_days: 30
+  
+  # Encryption
+  encrypt: true
+  
+  # Schedule
+  schedule:
+    interval: daily  # hourly, daily, weekly, monthly
+    keep_local: 7
+    keep_remote: 30
+  
+  # etcd snapshot (important for HA)
+  etcd_snapshot: true
+
+# Environment variables to set:
+# export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+# export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+# export PRIVATECLOUD_BACKUP_PASS=your-encryption-passphrase

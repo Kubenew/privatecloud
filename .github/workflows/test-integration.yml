@@ -1,0 +1,59 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install pytest pytest-cov
+
+      - name: Run unit tests
+        run: pytest tests/ -v --cov=privatecloud --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  test-cli-commands:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install CLI
+        run: |
+          pip install -e .
+
+      - name: Test CLI help commands
+        run: |
+          privatecloud --help
+          privatecloud init --help
+          privatecloud doctor --help
+          privatecloud plan --help
+          privatecloud backup --help
+          privatecloud cluster --help
+          privatecloud addon --help
+
+      - name: Test version
+        run: |
+          python -c "import privatecloud; print(privatecloud.__version__)"
+          python -c "import privatecloud; assert privatecloud.__version__ == '0.7.0'"
