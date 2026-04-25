@@ -6,6 +6,8 @@ from typing import Optional, List, Dict
 import urllib.request
 import urllib.error
 
+BACKUP_ROOT = Path("backups")
+
 
 def run_cmd(cmd, check=False, timeout=30):
     try:
@@ -276,6 +278,7 @@ def download_from_gcs(bucket: str, source: str, local_path: Optional[str] = None
     
     try:
         from google.cloud import storage
+        from google.oauth2 import service_account
         credentials = service_account.Credentials.from_service_account_file(creds['service_account'])
         client = storage.Client(project=creds['project_id'], credentials=credentials)
         bucket_obj = client.bucket(bucket)

@@ -14,6 +14,7 @@ class AddonCategory(Enum):
     STORAGE = "storage"
     SERVICE_MESH = "service-mesh"
     DATABASE = "database"
+    DEPLOYMENT = "deployment"
     OTHER = "other"
 
 

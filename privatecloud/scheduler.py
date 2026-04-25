@@ -92,7 +92,6 @@ def schedule_cron(new_line: str) -> bool:
     current = '\n'.join(filtered)
     new_crontab = f'{current}\n# PrivateCloud backup schedule\n{new_line}\n'.strip()
     
-    result = run_cmd(['crontab', '-'], timeout=10)
     proc = subprocess.Popen(
         ['crontab', '-'],
         stdin=subprocess.PIPE,
@@ -123,7 +122,7 @@ def schedule_systemd(interval: str, keep: int, encrypt: bool) -> bool:
 Description=PrivateCloud Backup Timer ({interval})
 
 [Timer]
-{interval_map.get(interval, interval_map['daily']}
+{interval_map.get(interval, interval_map['daily'])}
 Persistent=true
 
 [Install]

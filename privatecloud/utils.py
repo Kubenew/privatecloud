@@ -1,5 +1,7 @@
 import yaml
+import subprocess
 from pathlib import Path
+from typing import List, Optional
 from .config import PrivateCloudConfig
 
 
@@ -52,3 +54,27 @@ def save_default_config(path: str = "privatecloud.yaml"):
 
     with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(default, f, sort_keys=False)
+
+
+def run_cmd(cmd, check=False, capture=True, timeout=60):
+    """Shared subprocess runner with timeout and error handling."""
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=capture,
+            text=True,
+            timeout=timeout,
+            check=check,
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        return type('obj', (object,), {'returncode': 124, 'stdout': '', 'stderr': 'Timeout'})()
+    except Exception as e:
+        return type('obj', (object,), {'returncode': 1, 'stdout': '', 'stderr': str(e)})()
+
+
+def run_on_node(host: str, user: str, command: str, ssh_opts: Optional[List[str]] = None, timeout: int = 120):
+    """Execute a command on a remote node via SSH."""
+    opts = ssh_opts or ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
+    cmd = ["ssh", *opts, f"{user}@{host}", command]
+    return run_cmd(cmd, timeout=timeout)

@@ -137,7 +137,7 @@ def generate_initial_changelog() -> str:
 
 Generated: {datetime.datetime.now().strftime('%Y-%m-%d')}
 
-## [0.6.0] - {datetime.datetime.now().strftime('%Y-%m-%d')}
+## [0.7.0] - {datetime.datetime.now().strftime('%Y-%m-%d')}
 
 ### Features
 - Cluster upgrade command with dry-run support
@@ -274,7 +274,7 @@ def get_version_from_pyproject() -> str:
         for line in pyproject.read_text().split('\n'):
             if line.strip().startswith('version'):
                 return line.split('=')[1].strip().strip('"')
-    return "0.6.0"
+    return "0.7.0"
 
 
 def create_release_md(output_dir: Path = Path(".")):

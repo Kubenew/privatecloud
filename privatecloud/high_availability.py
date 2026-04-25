@@ -174,7 +174,7 @@ def get_cluster_health_ha() -> Dict:
     nodes = data.get('items', [])
     
     masters = [n for n in nodes if n.get('metadata', {}).get('labels', {}).get('node-role.kubernetes.io/master')]
-    workers = [n for n in nodes if not masters.__contains__(n)]
+    workers = [n for n in nodes if n not in masters]
     
     ready_masters = sum(1 for n in masters if is_node_ready(n))
     ready_workers = sum(1 for n in workers if is_node_ready(n))

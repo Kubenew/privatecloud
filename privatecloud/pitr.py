@@ -1,6 +1,7 @@
 import subprocess
 import json
 import time
+import yaml
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
@@ -81,13 +82,7 @@ def create_volume_snapshot(volume_name: str, namespace: str = "longhorn-system")
         }
     }
     
-    import yaml
     manifest_yaml = yaml.dump(manifest)
-    
-    result = run_cmd(
-        ["kubectl", "apply", "-f", "-"],
-        timeout=30
-    )
     
     proc = subprocess.Popen(
         ["kubectl", "apply", "-f", "-"],
@@ -240,7 +235,6 @@ def create_pvc_from_snapshot(
         }
     }
     
-    import yaml
     proc = subprocess.Popen(
         ["kubectl", "apply", "-f", "-"],
         stdin=subprocess.PIPE,

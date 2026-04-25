@@ -5,6 +5,7 @@ import datetime
 import tempfile
 import json
 from pathlib import Path
+from typing import Optional, List, Dict
 import shutil
 import sys
 
@@ -131,23 +132,28 @@ def encrypt_backup(tar_path, passphrase=None):
 
     age_path = shutil.which("age")
     if not age_path:
-        age_path = shutil.which("age-keygen")
-    
-    if not age_path:
         print("⚠️  age not found. Install from https://github.com/FiloSottile/age")
         return None
 
     encrypted_path = Path(str(tar_path) + ".age")
-    result = run_cmd([
-        "age", "--passphrase", "--output", str(encrypted_path), str(tar_path)
-    ], check=False)
-    
-    if result.returncode == 0:
-        tar_path.unlink()
-        return str(encrypted_path)
-    
-    print(f"⚠️  Encryption failed: {result.stderr}")
-    return None
+    try:
+        proc = subprocess.Popen(
+            ["age", "--passphrase", "--output", str(encrypted_path), str(tar_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = proc.communicate(input=passphrase.encode(), timeout=120)
+
+        if proc.returncode == 0:
+            Path(str(tar_path)).unlink()
+            return str(encrypted_path)
+
+        print(f"⚠️  Encryption failed: {stderr.decode()}")
+        return None
+    except Exception as e:
+        print(f"⚠️  Encryption failed: {e}")
+        return None
 
 
 def decrypt_backup(backup_path, passphrase=None):
@@ -163,15 +169,23 @@ def decrypt_backup(backup_path, passphrase=None):
     encrypted_path = Path(backup_path)
     temp_path = BACKUP_ROOT / encrypted_path.stem
 
-    result = run_cmd([
-        "age", "--decrypt", "--passphrase", "--output", str(temp_path), str(encrypted_path)
-    ], check=False, timeout=120)
+    try:
+        proc = subprocess.Popen(
+            ["age", "--decrypt", "--passphrase", "--output", str(temp_path), str(encrypted_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = proc.communicate(input=passphrase.encode(), timeout=120)
 
-    if result.returncode == 0:
-        return str(temp_path), str(temp_path)
-    
-    print(f"⚠️  Decryption failed: {result.stderr}")
-    return None, None
+        if proc.returncode == 0:
+            return str(temp_path), str(temp_path)
+
+        print(f"⚠️  Decryption failed: {stderr.decode()}")
+        return None, None
+    except Exception as e:
+        print(f"⚠️  Decryption failed: {e}")
+        return None, None
 
 
 def prune_longhorn_snapshots(keep_last=5):
@@ -224,7 +238,7 @@ def verify_backup(backup_name, passphrase=None):
 
     try:
         with tarfile.open(tar_path, "r:gz") as tar:
-            tar.extractall(extract_path)
+            tar.extractall(extract_path, filter="data")
 
         errors = []
         for item in extract_path.rglob("*.yaml"):
@@ -281,7 +295,7 @@ def restore_backup(backup_name, force=False, dry_run=False, passphrase=None):
 
     try:
         with tarfile.open(tar_path, "r:gz") as tar:
-            tar.extractall(extract_path)
+            tar.extractall(extract_path, filter="data")
 
         backup_dir_name = backup_name.replace(".tar.gz", "").replace(".tar.gz.age", "")
         extract_dir = extract_path / backup_dir_name

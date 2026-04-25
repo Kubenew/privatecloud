@@ -5,7 +5,7 @@ from typing import Any, Dict, Union
 import yaml
 
 SECRET_PATTERNS = [
-    (r'(token|password|api_key|secret|private_key|proxmox_token|token_secret)[\s]*[:=][\s]*["\']?([^"\'\\s]+)', r'\1="***"'),
+    (r'(token|password|api_key|secret|private_key|proxmox_token|token_secret)[\s]*[:=][\s]*["\']?([^"\'\s]+)', r'\1="***"'),
     (r'([a-f0-9]{32,})', '[HASH-MASKED]'),
     (r'([A-Za-z0-9+\/]{40,})', '[BASE64-MASKED]'),
     (r'([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})', '[UUID-MASKED]'),

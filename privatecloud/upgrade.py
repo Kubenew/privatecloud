@@ -91,7 +91,7 @@ def drain_node(node_name: str, timeout: int = 300) -> bool:
 
 
 def uncordon_node(node_name: str) -> bool:
-    console.print(f"[yellow]Uncording node {node_name}...[/yellow]")
+    console.print(f"[yellow]Uncordoning node {node_name}...[/yellow]")
     result = run_cmd(["kubectl", "uncordon", node_name])
     
     if result.returncode == 0:
@@ -212,15 +212,33 @@ def upgrade_cluster(target_version: str, backup: bool = True, dry_run: bool = Fa
     
     ssh_opts = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10"]
     
+    # Upgrade masters first
     for master in masters:
         if not master['ready']:
             console.print(f"[yellow]Skipping non-ready master: {master['name']}[/yellow]")
             continue
         
         console.print(f"[bold]Upgrading master: {master['name']}[/bold]")
+        drain_node(master['name'])
+        if not upgrade_k3s_master(master['name'], 'root', target_version, ssh_opts):
+            console.print(f"[red]❌ Master upgrade failed for {master['name']}. Aborting.[/red]")
+            uncordon_node(master['name'])
+            return False
+        uncordon_node(master['name'])
+    
+    # Upgrade workers
+    for worker in workers:
+        if not worker['ready']:
+            console.print(f"[yellow]Skipping non-ready worker: {worker['name']}[/yellow]")
+            continue
+        
+        console.print(f"[bold]Upgrading worker: {worker['name']}[/bold]")
+        drain_node(worker['name'])
+        if not upgrade_k3s_agent(worker['name'], 'root', target_version, ssh_opts):
+            console.print(f"[yellow]⚠️  Worker upgrade had issues for {worker['name']}[/yellow]")
+        uncordon_node(worker['name'])
     
     console.print(f"[green]✅ Cluster upgrade to {target_version} complete[/green]")
-    console.print("[yellow]Note: Rolling upgrade requires SSH access to nodes[/yellow]")
     
     return True
 

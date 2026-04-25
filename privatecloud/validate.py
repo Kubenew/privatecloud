@@ -82,7 +82,11 @@ def validate_nodes(nodes: List[Dict], provider: str) -> List[ValidationIssue]:
                     ))
                 
                 ip = node.get("host", "")
-                if ip and not re.match(r'^[\d.:a-fA-F]+$', ip):
+                # Validate IPv4, IPv6, or hostname
+                ipv4_re = r'^(\d{1,3}\.){3}\d{1,3}$'
+                ipv6_re = r'^[0-9a-fA-F:]+$'
+                hostname_re = r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$'
+                if ip and not (re.match(ipv4_re, ip) or re.match(ipv6_re, ip) or re.match(hostname_re, ip)):
                     issues.append(ValidationIssue(
                         severity="warning",
                         message=f"Node {i} host IP may be invalid: {ip}",

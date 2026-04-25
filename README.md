@@ -6,7 +6,7 @@ It focuses on **fast deployment**, **repeatable infrastructure**, and **producti
 
 ---
 
-## Features Overview (v0.6.0)
+## Features Overview (v0.7.0)
 
 ### Deployment
 - **Provider abstraction** — bare-metal SSH or Proxmox VE via Terraform

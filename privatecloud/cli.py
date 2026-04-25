@@ -3,6 +3,7 @@ from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
 import os
+import shutil
 from datetime import datetime
 
 from .doctor import check_tools, display_diagnostics
@@ -49,23 +50,24 @@ def doctor(diagnostics: bool = typer.Option(False, "--diagnostics", "-d", help="
     """Check system dependencies and cluster health."""
     if diagnostics:
         display_diagnostics()
-    else:
-        result = check_tools()
+        return
 
-        table = Table(title="PrivateCloud Doctor")
-        table.add_column("Tool")
-        table.add_column("Status")
+    result = check_tools()
 
-        for t in result.missing_required:
-            table.add_row(t, "[red]❌ MISSING (required)[/red]")
+    table = Table(title="PrivateCloud Doctor")
+    table.add_column("Tool")
+    table.add_column("Status")
 
-        for t in result.missing_optional:
-            table.add_row(t, "[yellow]⚠️  MISSING (optional)[/yellow]")
+    for t in result.missing_required:
+        table.add_row(t, "[red]❌ MISSING (required)[/red]")
 
-        if not result.missing_required and not result.missing_optional:
-            table.add_row("all", "[green]✅ OK[/green]")
+    for t in result.missing_optional:
+        table.add_row(t, "[yellow]⚠️  MISSING (optional)[/yellow]")
 
-        console.print(table)
+    if not result.missing_required and not result.missing_optional:
+        table.add_row("all", "[green]✅ OK[/green]")
+
+    console.print(table)
 
     if not result.ok:
         raise typer.Exit(code=1)
@@ -189,8 +191,7 @@ def destroy(
     return True
 
 
-if __name__ == "__main__":
-    app()
+
 
 
 backup_group = typer.Typer(help="Backup and restore operations.")
@@ -573,4 +574,8 @@ def release_notes(
         version = f"v{get_version_from_pyproject()}"
     notes = generate_release_notes(version)
     console.print(notes)
+
+
+if __name__ == "__main__":
+    app()
 
