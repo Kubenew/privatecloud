@@ -1,5 +1,12 @@
 # PrivateCloud
 
+[![PyPI Version](https://img.shields.io/pypi/v/privatecloud)](https://pypi.org/project/privatecloud/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/privatecloud)](https://pypi.org/project/privatecloud/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://github.com/Kubenew/privatecloud/actions/workflows/ci.yml/badge.svg)](https://github.com/Kubenew/privatecloud/actions/workflows/ci.yml)
+[![Downloads](https://pepy.tech/badge/privatecloud)](https://pepy.tech/project/privatecloud)
+[![Docker Pulls](https://img.shields.io/docker/pulls/privatecloud/cli)](https://hub.docker.com/r/privatecloud/cli)
+
 **PrivateCloud** is a Python CLI installer that provisions a Kubernetes-based private cloud stack.
 
 It focuses on **fast deployment**, **repeatable infrastructure**, and **production-ready defaults**.
