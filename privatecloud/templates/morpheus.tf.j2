@@ -1,0 +1,83 @@
+terraform {
+  required_providers {
+    hpe = {
+      source  = "HPE/hpe"
+    }
+  }
+}
+
+provider "hpe" {
+  morpheus {
+    url      = "{{ config.morpheus.url }}"
+    username = "{{ config.morpheus.username }}"
+    password = "{{ config.morpheus.password }}"
+    insecure = {{ config.morpheus.insecure | lower }}
+  }
+}
+
+# --- Data sources: resolve names -> IDs ---
+
+data "hpe_morpheus_group" "target" {
+  name = "{{ config.morpheus.group_name }}"
+}
+
+data "hpe_morpheus_cloud" "target" {
+  name = "{{ config.morpheus.cloud_name }}"
+}
+
+data "hpe_morpheus_instance_type" "target" {
+  name = "{{ config.morpheus.instance_type_name }}"
+}
+
+data "hpe_morpheus_instance_type_layout" "target" {
+  instance_type_id = data.hpe_morpheus_instance_type.target.id
+  name             = "{{ config.morpheus.layout_name }}"
+}
+
+data "hpe_morpheus_plan" "target" {
+  name = "{{ config.morpheus.plan_name }}"
+}
+
+# --- Master nodes ---
+
+resource "hpe_morpheus_instance" "master" {
+  count            = {{ config.morpheus.master_count }}
+  name             = "{{ config.cluster_name }}-master-${count.index}"
+  group_id         = data.hpe_morpheus_group.target.id
+  cloud_id         = data.hpe_morpheus_cloud.target.id
+  instance_type_id = data.hpe_morpheus_instance_type.target.id
+  layout_id        = data.hpe_morpheus_instance_type_layout.target.id
+  plan_id          = data.hpe_morpheus_plan.target.id
+
+  labels = ["privatecloud", "master", "{{ config.cluster_name }}"]
+
+  config_{{ config.morpheus.cloud_type }} {}
+}
+
+# --- Worker nodes ---
+
+resource "hpe_morpheus_instance" "worker" {
+  count            = {{ config.morpheus.worker_count }}
+  name             = "{{ config.cluster_name }}-worker-${count.index}"
+  group_id         = data.hpe_morpheus_group.target.id
+  cloud_id         = data.hpe_morpheus_cloud.target.id
+  instance_type_id = data.hpe_morpheus_instance_type.target.id
+  layout_id        = data.hpe_morpheus_instance_type_layout.target.id
+  plan_id          = data.hpe_morpheus_plan.target.id
+
+  labels = ["privatecloud", "worker", "{{ config.cluster_name }}"]
+
+  config_{{ config.morpheus.cloud_type }} {}
+}
+
+# --- Outputs: IPs for K3s installer ---
+
+output "master_ips" {
+  value       = hpe_morpheus_instance.master[*].primary_ip_address
+  description = "IP addresses of master nodes"
+}
+
+output "worker_ips" {
+  value       = hpe_morpheus_instance.worker[*].primary_ip_address
+  description = "IP addresses of worker nodes"
+}

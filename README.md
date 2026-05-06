@@ -13,10 +13,10 @@ It focuses on **fast deployment**, **repeatable infrastructure**, and **producti
 
 ---
 
-## Features Overview (v0.7.0)
+## Features Overview (v0.8.0)
 
 ### Deployment
-- **Provider abstraction** — bare-metal SSH or Proxmox VE via Terraform
+- **Provider abstraction** — bare-metal SSH, Proxmox VE, or HPE Morpheus VM Essentials via Terraform
 - **Terraform runner** — generates, applies, and destroys infrastructure automatically
 - **Config auto-write** — Terraform outputs (node IPs) written back to `privatecloud.yaml`
 - **Helm-based service installation** — all services deployed via Helm charts
@@ -125,7 +125,7 @@ privatecloud destroy --yes                        # skip confirmation
 
 ```yaml
 cluster_name: my-private-cloud
-provider: bare-metal          # or "proxmox"
+provider: bare-metal          # or "proxmox" or "morpheus"
 k3s_version: v1.29.0+k3s1
 
 nodes:
@@ -145,6 +145,19 @@ proxmox:
   master_count: 1
   worker_count: 2
 
+# morpheus:
+#   url: https://morpheus.example.com
+#   username: admin
+#   password: ${MORPHEUS_PASSWORD}
+#   group_name: My Group
+#   cloud_name: My Cloud
+#   instance_type_name: Ubuntu
+#   layout_name: VMware VM
+#   plan_name: 1 CPU, 2GB Memory
+#   master_count: 1
+#   worker_count: 2
+#   cloud_type: vmware
+
 services:
   metallb: true
   ingress_nginx: true
@@ -161,6 +174,7 @@ services:
 |----------|--------|-------------|
 | Bare-metal | ✅ Stable | Direct SSH installation |
 | Proxmox | ✅ v0.2.0 | Proxmox VE via Terraform |
+| HPE Morpheus | ✅ v0.8.0 | HPE Morpheus VM Essentials via Terraform |
 | Hetzner | 🔜 v0.7.0 | Hetzner Cloud API |
 | LibVirt | 🔜 v0.7.0 | Local KVM/libvirt VMs |
 | vSphere | 📋 Backlog | VMware vSphere integration |

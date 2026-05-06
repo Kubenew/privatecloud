@@ -86,6 +86,18 @@ def plan():
         for i, n in enumerate(cfg.nodes):
             role = "master" if i == 0 else "worker"
             console.print(f"  - {n.user}@{n.host}:{n.port} ({role})")
+    elif cfg.provider == "morpheus":
+        console.print("[bold]Nodes:[/bold] [yellow]Will be provisioned via HPE Morpheus[/yellow]")
+        if cfg.morpheus:
+            console.print(f"  Morpheus URL:    {cfg.morpheus.url}")
+            console.print(f"  Group:           {cfg.morpheus.group_name}")
+            console.print(f"  Cloud:           {cfg.morpheus.cloud_name}")
+            console.print(f"  Cloud Type:      {cfg.morpheus.cloud_type}")
+            console.print(f"  Instance Type:   {cfg.morpheus.instance_type_name}")
+            console.print(f"  Layout:          {cfg.morpheus.layout_name}")
+            console.print(f"  Plan:            {cfg.morpheus.plan_name}")
+            console.print(f"  SSH User:        {cfg.morpheus.ssh_user}")
+            console.print(f"  Masters: {cfg.morpheus.master_count}, Workers: {cfg.morpheus.worker_count}")
     else:
         console.print("[bold]Nodes:[/bold] [yellow]Will be provisioned dynamically via Terraform[/yellow]")
 

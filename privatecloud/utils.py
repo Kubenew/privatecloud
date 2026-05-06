@@ -43,6 +43,20 @@ def save_default_config(path: str = "privatecloud.yaml"):
             "storage": "local-lvm",
             "bridge": "vmbr0",
         },
+        # Uncomment and configure if provider: morpheus
+        # "morpheus": {
+        #     "url": "https://morpheus.example.com",
+        #     "username": "admin",
+        #     "password": "${MORPHEUS_PASSWORD}",
+        #     "group_name": "My Group",
+        #     "cloud_name": "My Cloud",
+        #     "instance_type_name": "Ubuntu",
+        #     "layout_name": "VMware VM",
+        #     "plan_name": "1 CPU, 2GB Memory",
+        #     "master_count": 1,
+        #     "worker_count": 2,
+        #     "cloud_type": "vmware",
+        # },
         "services": {
             "metallb": True,
             "ingress_nginx": True,

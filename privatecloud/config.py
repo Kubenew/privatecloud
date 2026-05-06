@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Literal
 
-SUPPORTED_PROVIDERS = ("bare-metal", "proxmox")
+SUPPORTED_PROVIDERS = ("bare-metal", "proxmox", "morpheus")
+SUPPORTED_CLOUD_TYPES = ("vmware", "aws", "azure", "gcp", "hvm", "openstack")
 
 
 class NodeConfig(BaseModel):
@@ -37,6 +38,38 @@ class ProxmoxConfig(BaseModel):
     worker_disk: str = "40G"
 
 
+class MorpheusConfig(BaseModel):
+    url: str = "https://morpheus.example.com"
+    username: str = "admin"
+    password: str = "${MORPHEUS_PASSWORD}"
+    insecure: bool = True
+
+    # Morpheus resource names
+    group_name: str = "My Group"
+    cloud_name: str = "My Cloud"
+    instance_type_name: str = "Ubuntu"
+    layout_name: str = "VMware VM"
+    plan_name: str = "1 CPU, 2GB Memory"
+
+    master_count: int = Field(default=1, ge=1)
+    worker_count: int = Field(default=2, ge=0)
+
+    # Cloud type for the Terraform config block (e.g. config_vmware {})
+    cloud_type: str = "vmware"
+
+    ssh_user: str = "cloud-user"
+
+    @field_validator("cloud_type")
+    @classmethod
+    def validate_cloud_type(cls, v: str) -> str:
+        if v not in SUPPORTED_CLOUD_TYPES:
+            raise ValueError(
+                f"Unsupported cloud_type '{v}'. "
+                f"Supported: {', '.join(SUPPORTED_CLOUD_TYPES)}"
+            )
+        return v
+
+
 class PrivateCloudConfig(BaseModel):
     cluster_name: str = "my-private-cloud"
     provider: str = "bare-metal"
@@ -45,6 +78,7 @@ class PrivateCloudConfig(BaseModel):
 
     nodes: List[NodeConfig] = Field(default_factory=list)
     proxmox: Optional[ProxmoxConfig] = None
+    morpheus: Optional[MorpheusConfig] = None
     services: ServicesConfig = Field(default_factory=ServicesConfig)
 
     ssh_key_path: Optional[str] = None

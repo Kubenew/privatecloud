@@ -4,6 +4,17 @@ Generated: 2026-04-24
 
 ---
 
+## [0.8.0] - 2026-05-06
+
+### Features
+
+#### HPE Morpheus Provider
+- Added support for HPE Morpheus VM Essentials Software via Terraform `HPE/hpe` provider.
+- Configurable instance types, layouts, clouds, and networking via `morpheus` config block.
+- Dynamic lookup of Morpheus resources.
+
+---
+
 ## [0.7.0] - 2026-04-24
 
 ### Features

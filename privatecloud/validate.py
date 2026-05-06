@@ -48,7 +48,7 @@ def validate_yaml_syntax(path: str = "privatecloud.yaml") -> Tuple[bool, List[Va
 
 def validate_provider(provider: str) -> List[ValidationIssue]:
     issues = []
-    supported = ["bare-metal", "proxmox"]
+    supported = ["bare-metal", "proxmox", "morpheus"]
     
     if provider not in supported:
         issues.append(ValidationIssue(
@@ -139,6 +139,84 @@ def validate_proxmox_config(config: Dict, provider: str) -> List[ValidationIssue
             message="Proxmox token_secret is still default placeholder",
             field="proxmox.token_secret",
             suggestion="Generate a real API token in Proxmox UI"
+        ))
+    
+    return issues
+
+
+def validate_morpheus_config(config: Dict, provider: str) -> List[ValidationIssue]:
+    issues = []
+    
+    if provider != "morpheus":
+        if config:
+            issues.append(ValidationIssue(
+                severity="warning",
+                message="Morpheus config provided but provider is not 'morpheus'",
+                field="morpheus"
+            ))
+        return issues
+    
+    required_fields = ["url", "username", "password", "group_name", "cloud_name"]
+    for field in required_fields:
+        if not config.get(field):
+            issues.append(ValidationIssue(
+                severity="error",
+                message=f"Missing required Morpheus field: {field}",
+                field=f"morpheus.{field}"
+            ))
+    
+    url = config.get("url", "")
+    if url and not re.match(r'^https?://', url):
+        issues.append(ValidationIssue(
+            severity="error",
+            message=f"Invalid Morpheus URL: {url}",
+            field="morpheus.url",
+            suggestion="URL should start with https://"
+        ))
+    
+    if config.get("password") == "${MORPHEUS_PASSWORD}":
+        issues.append(ValidationIssue(
+            severity="warning",
+            message="Morpheus password is still default env var placeholder",
+            field="morpheus.password",
+            suggestion="Set MORPHEUS_PASSWORD env var or replace with actual password"
+        ))
+    
+    # Validate cloud_type
+    cloud_type = config.get("cloud_type", "vmware")
+    supported_cloud_types = ["vmware", "aws", "azure", "gcp", "hvm", "openstack"]
+    if cloud_type not in supported_cloud_types:
+        issues.append(ValidationIssue(
+            severity="error",
+            message=f"Unsupported Morpheus cloud_type: {cloud_type}",
+            field="morpheus.cloud_type",
+            suggestion=f"Supported cloud types: {', '.join(supported_cloud_types)}"
+        ))
+    
+    # Validate node counts
+    master_count = config.get("master_count", 1)
+    if isinstance(master_count, int) and master_count < 1:
+        issues.append(ValidationIssue(
+            severity="error",
+            message="master_count must be at least 1",
+            field="morpheus.master_count"
+        ))
+    
+    worker_count = config.get("worker_count", 2)
+    if isinstance(worker_count, int) and worker_count < 0:
+        issues.append(ValidationIssue(
+            severity="error",
+            message="worker_count cannot be negative",
+            field="morpheus.worker_count"
+        ))
+    
+    total = (master_count if isinstance(master_count, int) else 0) + (worker_count if isinstance(worker_count, int) else 0)
+    if total > 20:
+        issues.append(ValidationIssue(
+            severity="warning",
+            message=f"Large deployment: {total} nodes total",
+            field="morpheus",
+            suggestion="Verify your Morpheus license and resource capacity"
         ))
     
     return issues
@@ -248,6 +326,7 @@ def lint_config(path: str = "privatecloud.yaml", fix: bool = False) -> Tuple[boo
     all_issues.extend(validate_provider(config.get("provider", "")))
     all_issues.extend(validate_nodes(config.get("nodes", []), config.get("provider", "")))
     all_issues.extend(validate_proxmox_config(config.get("proxmox", {}), config.get("provider", "")))
+    all_issues.extend(validate_morpheus_config(config.get("morpheus", {}), config.get("provider", "")))
     all_issues.extend(validate_services(config.get("services", {})))
     all_issues.extend(validate_k3s_version(config.get("k3s_version", "")))
     all_issues.extend(check_secrets_in_config(config))
