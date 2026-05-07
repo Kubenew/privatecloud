@@ -15,9 +15,12 @@ It focuses on **fast deployment**, **repeatable infrastructure**, and **producti
 
 ---
 
+
 ## Demo
 
-![PrivateCloud Demo](docs/demo.gif)
+![PrivateCloud Demo](https://raw.githubusercontent.com/Kubenew/privatecloud/main/docs/demo.gif)
+
+[▶ Watch full demo video](https://raw.githubusercontent.com/Kubenew/privatecloud/main/docs/demo.mp4)
 
 ---
 
