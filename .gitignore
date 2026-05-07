@@ -225,3 +225,23 @@ main.tf
 
 # PrivateCloud Secrets
 privatecloud.yaml
+# PrivateCloud specific
+privatecloud.yaml
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+*.secrets
+*.env
+backup_*/
+kubeconfig
+
+# General secrets
+**/.env
+**/.secrets
+**/*.pem
+**/*.key
+**/*-secret.yaml
+
+# Kubernetes
+.kube/config

@@ -7,9 +7,17 @@
 [![Downloads](https://pepy.tech/badge/privatecloud)](https://pepy.tech/project/privatecloud)
 [![Docker Pulls](https://img.shields.io/docker/pulls/privatecloud/cli)](https://hub.docker.com/r/privatecloud/cli)
 
+## Deploy a production-ready private Kubernetes cloud in minutes using Python, Terraform, and K3s.
+
 **PrivateCloud** is a Python CLI installer that provisions a Kubernetes-based private cloud stack.
 
 It focuses on **fast deployment**, **repeatable infrastructure**, and **production-ready defaults**.
+
+---
+
+## Demo
+
+![PrivateCloud Demo](docs/demo.gif)
 
 ---
 
